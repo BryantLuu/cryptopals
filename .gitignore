@@ -4,3 +4,4 @@ __pycache__
 dist
 develop.py
 crypto.egg-info
+build
