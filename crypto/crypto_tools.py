@@ -142,3 +142,8 @@ class Crypto_Kit():
     def chunked(self, size, source):
         for i in range(0, len(source), size):
             yield source[i:i+size]
+
+
+    def pad_to_length(self, bytes_string, length):
+        pad_amount = length - len(bytes_string)
+        return bytes_string + bytes([pad_amount] * pad_amount)
