@@ -6,6 +6,7 @@ from random import randint
 
 global_random_key = bytes([randint(0, 255) for i in range(16)])
 global_random_prefix = bytes([randint(0, 255) for i in range(randint(5, 40))])
+global_random_iv = bytes([randint(0, 255) for i in range(16)])
 
 
 class Crypto_Kit():
@@ -278,4 +279,54 @@ class Crypto_Kit():
     def decrypt_profile(self, profile):
         global global_random_key
         decrypted = self.ecb_decrypt(global_random_key, profile)
+        return decrypted
+
+    def validate_pkcs_7(self, plain_text):
+        possible_padding = [i for i in range(1, 16)]
+        padding_set = set()
+        padding_amount = 0
+        for char in range(1, len(plain_text)):
+            if plain_text[-char] in possible_padding:
+                padding_set.add(plain_text[-char])
+                padding_amount += 1
+            else:
+                if len(padding_set) != 1:
+                    raise ValueError("bad padding")
+                if list(padding_set)[0] == padding_amount:
+                    return plain_text[0:-char + 1]
+        return plain_text[0:-padding_amount]
+
+    def add_pkcs_7_padding(self, plain_text, key):
+        need_padding = math.ceil(
+            len(plain_text) / len(key)) * len(key) - len(plain_text)
+
+        padded_plain_text = self.pad_to_length(plain_text,
+                                               len(plain_text) + need_padding)
+
+        return padded_plain_text
+
+    def pend_attack(self, plain_text):
+        global global_random_iv
+        global global_random_key
+        clean = plain_text.replace(";", '')
+        clean = clean.replace("=", '')
+        with_padding = self.add_pkcs_7_padding(
+            b"comment1=cooking%20MCs;userdata=" + bytes(clean, 'utf-8') +
+            b";comment2=%20like%20a%20pound%20of%20bacon", global_random_key)
+        return self.cbc_encrypt(global_random_key, global_random_iv,
+                                with_padding)
+
+    def is_admin(self, encrypted_bytes):
+        global global_random_iv
+        global global_random_key
+        decrypted = self.cbc_decrypt(global_random_key, global_random_iv,
+                                     encrypted_bytes)
+        print(decrypted)
+        return b";admin=true" in decrypted
+
+    def decrypt_oracle(self, encrypted_bytes):
+        global global_random_iv
+        global global_random_key
+        decrypted = self.cbc_decrypt(global_random_key, global_random_iv,
+                                     encrypted_bytes)
         return decrypted

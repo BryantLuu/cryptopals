@@ -299,3 +299,16 @@ class TestClass(unittest.TestCase):
             decrypted_bytes,
             b"Rollin' in my 5.0\nWith my rag-top down so my hair can blow\nThe girlies on standby waving just to say hi\nDid you stop? No, I just drove by\n\x01"
         )
+
+        def test_set_2_problem_15(self):
+            c = self.crypto_kit
+            attack_string = 'AAAA admin true '
+            result = c.pend_attack(attack_string)
+
+            byte_array = bytearray(result)
+            byte_array[20] = bytes([byte_array[20] ^ 59 ^ 32])[0]
+            byte_array[26] = bytes([byte_array[26] ^ 61 ^ 32])[0]
+            byte_array[31] = bytes([byte_array[31] ^ 59 ^ 32])[0]
+            new_bytes = bytes(byte_array)
+
+            self.assertEqual(c.is_admin(new_bytes), True)
