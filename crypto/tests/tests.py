@@ -236,4 +236,66 @@ class TestClass(unittest.TestCase):
         )
 
     def test_set_2_problem_14(self):
-        return
+        c = self.crypto_kit
+        unknown_string = """
+            Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkg
+            aGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBq
+            dXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUg
+            YnkK
+        """
+
+        unencrypted_string = c.decode_base64(unknown_string)
+
+        def get_unknown_bytes():
+            for i in range(100):
+                result = c.ecb_encryption_oracle_random_prefix(
+                    b'a' * i, unencrypted_string)
+                byte_set = set()
+                prefix_bytes = b''
+                split_bytes = list(c.chunked(16, result))
+                for byte in split_bytes:
+                    if byte in byte_set:
+                        return result, i, len(prefix_bytes)
+                    prefix_bytes += byte
+                    byte_set.add(byte)
+
+        cipher_length = 16
+        result, bytes_amount, ignore_bytes = get_unknown_bytes()
+        bytes_amount -= 16
+        known_bytes = bytearray(bytes([0] * 15))
+
+        chunks = list(c.chunked(cipher_length, result[ignore_bytes:]))
+        decrypted_bytes = b''
+
+        for chunk in range(len(chunks)):
+            block = chunk * cipher_length
+
+            for i in range(cipher_length):
+                dictionary = {}
+                offset = cipher_length - 1 - i
+                bytes_we_know = bytes(known_bytes[-(cipher_length - 1):])
+                for j in range(256):
+                    guess = bytes(bytes_we_know + bytes([j]))
+
+                    key = c.ecb_encryption_oracle_random_prefix(
+                        b'a' * bytes_amount + bytes(guess),
+                        unencrypted_string)[ignore_bytes:ignore_bytes +
+                                            cipher_length]
+
+                    dictionary[key] = guess
+
+                saved_byte = c.ecb_encryption_oracle_random_prefix(
+                    b'a' * bytes_amount + known_bytes[0:offset],
+                    unencrypted_string)[ignore_bytes + block:ignore_bytes +
+                                        block + cipher_length]
+                if saved_byte in dictionary:
+                    correct_byte = dictionary[saved_byte][-1]
+                    known_bytes.append(correct_byte)
+                    decrypted_bytes += bytes([correct_byte])
+
+                print(known_bytes)
+
+        self.assertEqual(
+            decrypted_bytes,
+            b"Rollin' in my 5.0\nWith my rag-top down so my hair can blow\nThe girlies on standby waving just to say hi\nDid you stop? No, I just drove by\n\x01"
+        )

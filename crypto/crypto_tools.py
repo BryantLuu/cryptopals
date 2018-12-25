@@ -5,6 +5,7 @@ from Crypto.Cipher import AES
 from random import randint
 
 global_random_key = bytes([randint(0, 255) for i in range(16)])
+global_random_prefix = bytes([randint(0, 255) for i in range(randint(5, 40))])
 
 
 class Crypto_Kit():
@@ -237,6 +238,12 @@ class Crypto_Kit():
     def ecb_encryption_oracle(self, plain_text, unknown_string):
         global global_random_key
         plain_text = bytes(plain_text + unknown_string)
+        return self.ecb_encrypt(global_random_key, plain_text)
+
+    def ecb_encryption_oracle_random_prefix(self, plain_text, unknown_string):
+        global global_random_key
+        global global_random_prefix
+        plain_text = bytes(global_random_prefix + plain_text + unknown_string)
         return self.ecb_encrypt(global_random_key, plain_text)
 
     def get_ecb_cipher_length(self, encrypted_bytes):

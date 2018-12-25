@@ -6,42 +6,67 @@ from Crypto.Cipher import AES
 from random import randint
 
 cryp = Crypto_Kit()
+unknown_string = """
+    Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkg
+    aGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBq
+    dXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUg
+    YnkK
+"""
+
+unencrypted_string = cryp.decode_base64(unknown_string)
+
+result = []
 
 
-def get_cipher_length():
-    profile = cryp.profile_for("a")
-    length = len(profile)
+def get_unknown_bytes():
+    global result
     for i in range(100):
-        result = cryp.profile_for("a" * i)
-        if len(result) != length:
-            return len(result) - length
+        result = cryp.ecb_encryption_oracle_random_prefix(
+            b'a' * i, unencrypted_string)
+        byte_set = set()
+        prefix_bytes = b''
+        split_bytes = list(cryp.chunked(16, result))
+        for byte in split_bytes:
+            if byte in byte_set:
+                return i, len(prefix_bytes)
+            prefix_bytes += byte
+            byte_set.add(byte)
 
 
-cipher_length = get_cipher_length()
+cipher_length = 16
+bytes_amount, ignore_bytes = get_unknown_bytes()
+bytes_amount -= 16
+known_bytes = bytearray(bytes([0] * 15))
 
-need_bytes = b'email=&uid=10&role='
-email_length = math.ceil(
-    len(need_bytes) / cipher_length) * cipher_length - len(need_bytes)
+chunks = list(cryp.chunked(cipher_length, result[ignore_bytes:]))
+decrypted_bytes = b''
 
-email = "a" * email_length
-first_half_encrypted = cryp.profile_for(email)[0:len(need_bytes) +
-                                               email_length]
-admin_padding = cipher_length - len(b'admin')
-second_half_decrypted = (
-    b'admin' + bytes([admin_padding] * admin_padding)).decode('utf-8')
+for chunk in range(len(chunks)):
+    block = chunk * cipher_length
 
+    for i in range(cipher_length):
+        dictionary = {}
+        offset = cipher_length - 1 - i
+        bytes_we_know = bytes(known_bytes[-(cipher_length - 1):])
+        for j in range(256):
+            guess = bytes(bytes_we_know + bytes([j]))
 
-def isolate_block():
-    for i in range(100):
-        if cryp.dup_block_counts(cryp.profile_for("a" * i)) > 0:
-            return i
+            key = cryp.ecb_encryption_oracle_random_prefix(
+                b'a' * bytes_amount + bytes(guess),
+                unencrypted_string)[ignore_bytes:ignore_bytes + cipher_length]
 
+            dictionary[key] = guess
 
-second_half_encrypted = cryp.profile_for("a" * (isolate_block() - 16) +
-                                         second_half_decrypted)[32:32 +
-                                                                cipher_length]
+        saved_byte = cryp.ecb_encryption_oracle_random_prefix(
+            b'a' * bytes_amount + known_bytes[0:offset],
+            unencrypted_string)[ignore_bytes + block:ignore_bytes + block +
+                                cipher_length]
+        if saved_byte in dictionary:
+            correct_byte = dictionary[saved_byte][-1]
+            known_bytes.append(correct_byte)
+            decrypted_bytes += bytes([correct_byte])
 
-cryp.decrypt_profile(first_half_encrypted + second_half_encrypted)
+        print(known_bytes)
 
 import ipdb
 ipdb.set_trace()
