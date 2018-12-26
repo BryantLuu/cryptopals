@@ -178,7 +178,10 @@ class Crypto_Kit():
             decrypted_bytes += cipher.decrypt(block)
         return decrypted_bytes
 
-    def cbc_decrypt(self, key, iv, encrypted_bytes):
+    def cbc_decrypt(self,
+                    key=global_random_key,
+                    iv=global_random_key,
+                    encrypted_bytes=b''):
         cipher = AES.new(key, AES.MODE_ECB)
         decrypted_bytes = b""
         blocks = list(self.chunked(len(key), encrypted_bytes))
@@ -282,23 +285,18 @@ class Crypto_Kit():
         return decrypted
 
     def validate_pkcs_7(self, plain_text):
-        possible_padding = [i for i in range(1, 16)]
-        padding_set = set()
-        padding_amount = 0
-        for char in range(1, len(plain_text)):
-            if plain_text[-char] in possible_padding:
-                padding_set.add(plain_text[-char])
-                padding_amount += 1
-            else:
-                if len(padding_set) != 1:
-                    raise ValueError("bad padding")
-                if list(padding_set)[0] == padding_amount:
-                    return plain_text[0:-char + 1]
-        return plain_text[0:-padding_amount]
+        possible_padding = [i for i in range(1, 17)]
+        if plain_text[-1] not in possible_padding:
+            return False
+        padding_amount = plain_text[-1]
+        valid = all(
+            [char == padding_amount for char in plain_text[-padding_amount:]])
+        if valid:
+            return plain_text[0:-padding_amount]
+        return False
 
     def add_pkcs_7_padding(self, plain_text, key):
-        need_padding = math.ceil(
-            len(plain_text) / len(key)) * len(key) - len(plain_text)
+        need_padding = len(key) - len(plain_text) % len(key)
 
         padded_plain_text = self.pad_to_length(plain_text,
                                                len(plain_text) + need_padding)
@@ -321,7 +319,6 @@ class Crypto_Kit():
         global global_random_key
         decrypted = self.cbc_decrypt(global_random_key, global_random_iv,
                                      encrypted_bytes)
-        print(decrypted)
         return b";admin=true" in decrypted
 
     def decrypt_oracle(self, encrypted_bytes):
@@ -330,3 +327,30 @@ class Crypto_Kit():
         decrypted = self.cbc_decrypt(global_random_key, global_random_iv,
                                      encrypted_bytes)
         return decrypted
+
+    def get_random_cbc_encrypted_string(self):
+        global global_random_iv
+        global global_random_key
+        random_strings = [
+            'MDAwMDAwTm93IHRoYXQgdGhlIHBhcnR5IGlzIGp1bXBpbmc=',
+            'MDAwMDAxV2l0aCB0aGUgYmFzcyBraWNrZWQgaW4gYW5kIHRoZSBWZWdhJ3MgYXJlIHB1bXBpbic=',
+            'MDAwMDAyUXVpY2sgdG8gdGhlIHBvaW50LCB0byB0aGUgcG9pbnQsIG5vIGZha2luZw==',
+            'MDAwMDAzQ29va2luZyBNQydzIGxpa2UgYSBwb3VuZCBvZiBiYWNvbg==',
+            'MDAwMDA0QnVybmluZyAnZW0sIGlmIHlvdSBhaW4ndCBxdWljayBhbmQgbmltYmxl',
+            'MDAwMDA1SSBnbyBjcmF6eSB3aGVuIEkgaGVhciBhIGN5bWJhbA==',
+            'MDAwMDA2QW5kIGEgaGlnaCBoYXQgd2l0aCBhIHNvdXBlZCB1cCB0ZW1wbw==',
+            'MDAwMDA3SSdtIG9uIGEgcm9sbCwgaXQncyB0aW1lIHRvIGdvIHNvbG8=',
+            'MDAwMDA4b2xsaW4nIGluIG15IGZpdmUgcG9pbnQgb2g=',
+            'MDAwMDA5aXRoIG15IHJhZy10b3AgZG93biBzbyBteSBoYWlyIGNhbiBibG93',
+        ]
+        selected_string = self.decode_base64(random_strings[randint(0, 9)])
+        print(selected_string)
+        return self.cbc_encrypt(global_random_key, global_random_iv,
+                                selected_string), global_random_iv
+
+    def decrypt_with_padding(self, encrypted_bytes, iv):
+        global global_random_key
+        decrypted = self.cbc_decrypt(global_random_key, iv, encrypted_bytes)
+        if self.validate_pkcs_7(decrypted) is True:
+            return True
+        return False

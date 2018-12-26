@@ -302,7 +302,17 @@ class TestClass(unittest.TestCase):
 
         def test_set_2_problem_15(self):
             c = self.crypto_kit
-            attack_string = 'AAAA admin true '
+            self.assertEqual(
+                c.validate_pkcs_7(b"ICE ICE BABY\x04\x04\x04\x04"),
+                b"ICE ICE BABY")
+            self.assertEqual(
+                c.validate_pkcs_7(b"ICE ICE BABY\x05\x05\x05\x05"), False)
+            self.assertEqual(
+                c.validate_pkcs_7(b"ICE ICE BABY\x05\x05\x05\x05"), False)
+
+        def test_set_2_problem_16(self):
+            c = self.crypto_kit
+            attack_string = 'AAA admin true '
             result = c.pend_attack(attack_string)
 
             byte_array = bytearray(result)
@@ -312,3 +322,65 @@ class TestClass(unittest.TestCase):
             new_bytes = bytes(byte_array)
 
             self.assertEqual(c.is_admin(new_bytes), True)
+
+        def test_set_3_problem_17(self):
+            c = self.crypto_kit
+            encrypted_bytes, iv = c.get_random_cbc_encrypted_string()
+            chunked_bytes = list(c.chunked(16, encrypted_bytes))
+
+            answer = b''
+
+            block = iv[0:]
+            plain_text = bytearray([0] * 16)
+            for target in reversed(range(len(block))):
+                pad_length = len(block) - target
+                poisoned_bytes = bytearray([0] * 16)
+                padding_bytes = bytes([0] * target) + bytes(
+                    [pad_length] * pad_length)
+                for k in range(0, 256):
+                    if pad_length == 1 and k == pad_length:
+                        continue
+                    poisoned_bytes[target] = k
+                    malformed_bytes = c.fixed_xor(block, plain_text)
+                    malformed_bytes = c.fixed_xor(malformed_bytes,
+                                                  poisoned_bytes)
+                    malformed_bytes = c.fixed_xor(malformed_bytes,
+                                                  padding_bytes)
+                    valid_padding = c.decrypt_with_padding(
+                        chunked_bytes[0], malformed_bytes)
+                    if valid_padding:
+                        plain_text[target] = bytes([k])[0]
+                        break
+            answer += bytes(plain_text)
+
+            for i in range(len(chunked_bytes) - 1):
+                block = chunked_bytes[i]
+                plain_text = bytearray([0] * 16)
+
+                for target in reversed(range(len(block))):
+                    pad_length = len(block) - target
+                    poisoned_bytes = bytearray([0] * 16)
+                    padding_bytes = bytes([0] * target) + bytes(
+                        [pad_length] * pad_length)
+                    for k in range(0, 256):
+                        if pad_length == 1 and k == pad_length:
+                            continue
+                        poisoned_bytes[target] = k
+                        malformed_bytes = c.fixed_xor(block, plain_text)
+                        malformed_bytes = c.fixed_xor(malformed_bytes,
+                                                      poisoned_bytes)
+                        malformed_bytes = c.fixed_xor(malformed_bytes,
+                                                      padding_bytes)
+                        malformed_cipher = b''.join(
+                            chunked_bytes[0:i]
+                        ) + malformed_bytes + chunked_bytes[i + 1]
+
+                        valid_padding = c.decrypt_with_padding(
+                            malformed_cipher, iv)
+                        if valid_padding:
+                            plain_text[target] = bytes([k])[0]
+                            break
+                answer += bytes(plain_text)
+
+            decrypted = c.cbc_decrypt(iv=iv, encrypted_bytes=encrypted_bytes)
+            self.assertEqual(decrypted, answer)
