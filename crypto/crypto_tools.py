@@ -1,6 +1,7 @@
 import base64
 import codecs
 import math
+import struct
 from Crypto.Cipher import AES
 from random import randint
 
@@ -354,3 +355,21 @@ class Crypto_Kit():
         if self.validate_pkcs_7(decrypted) is True:
             return True
         return False
+
+    def ctr_encrypt(self, key, nonce, plain_text):
+        counter = 0
+        cipher = AES.new(key, AES.MODE_ECB)
+        returned_bytes = b''
+        for chunk in self.chunked(len(key), plain_text):
+            iv = struct.pack("<QQ", nonce, counter)
+
+            if len(chunk) == len(key):
+                returned_bytes += self.fixed_xor(chunk, cipher.encrypt(iv))
+            else:
+                import ipdb
+                ipdb.set_trace()
+                returned_bytes += self.fixed_xor(
+                    chunk,
+                    cipher.encrypt(iv)[:len(chunk)])
+            counter += 1
+        return returned_bytes

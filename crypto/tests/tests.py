@@ -384,3 +384,12 @@ class TestClass(unittest.TestCase):
 
             decrypted = c.cbc_decrypt(iv=iv, encrypted_bytes=encrypted_bytes)
             self.assertEqual(decrypted, answer)
+
+        def test_set_3_problem_18(self):
+            c = self.crypto_kit
+            encrypted_bytes = c.decode_base64(
+                "L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ=="
+            )
+            self.assertEqual(
+                c.ctr_encrypt("YELLOW SUBMARINE", 0, encrypted_bytes),
+                b"Yo, VIP Let's kick it Ice, Ice, baby Ice, Ice, baby ")
