@@ -356,7 +356,7 @@ class Crypto_Kit():
             return True
         return False
 
-    def ctr_encrypt(self, key, nonce, plain_text):
+    def ctr_encrypt(self, key=global_random_key, nonce=0, plain_text=b''):
         counter = 0
         cipher = AES.new(key, AES.MODE_ECB)
         returned_bytes = b''
@@ -366,8 +366,6 @@ class Crypto_Kit():
             if len(chunk) == len(key):
                 returned_bytes += self.fixed_xor(chunk, cipher.encrypt(iv))
             else:
-                import ipdb
-                ipdb.set_trace()
                 returned_bytes += self.fixed_xor(
                     chunk,
                     cipher.encrypt(iv)[:len(chunk)])

@@ -393,3 +393,39 @@ class TestClass(unittest.TestCase):
             self.assertEqual(
                 c.ctr_encrypt("YELLOW SUBMARINE", 0, encrypted_bytes),
                 b"Yo, VIP Let's kick it Ice, Ice, baby Ice, Ice, baby ")
+
+        def test_set_3_problem_19(self):
+            c = self.crypto_kit
+            with open('./tests/19.txt', 'r') as myfile:
+                plain_encoded = myfile.read().splitlines()
+
+            plain_texts = [c.decode_base64(result) for result in plain_encoded]
+
+            encrypted_results = [
+                c.ctr_encrypt(plain_text=plain_text)
+                for plain_text in plain_texts
+            ]
+
+            key_stream = b''
+
+            for i in range(len(encrypted_results[0])):
+                max_score = 0
+                key_stream_byte = b''
+                for j in range(256):
+                    score = 0
+                    for line in encrypted_results:
+                        if i < len(line):
+                            possible_plain_byte = bytes([line[i] ^ j])
+                            if possible_plain_byte:
+                                possible_plain_text = possible_plain_byte[0]
+                                if c.is_english_character(possible_plain_text):
+                                    score += c.letter_scores[chr(
+                                        possible_plain_text).upper()]
+                    if score > max_score:
+                        max_score = score
+                        key_stream_byte = bytes([j])
+                key_stream += key_stream_byte
+
+            self.assertEqual(
+                cryp.fixed_xor(encrypted_results[0], key_stream),
+                b'i have met them at close of daY')
