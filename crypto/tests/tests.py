@@ -300,38 +300,60 @@ class TestClass(unittest.TestCase):
             b"Rollin' in my 5.0\nWith my rag-top down so my hair can blow\nThe girlies on standby waving just to say hi\nDid you stop? No, I just drove by\n\x01"
         )
 
-        def test_set_2_problem_15(self):
-            c = self.crypto_kit
-            self.assertEqual(
-                c.validate_pkcs_7(b"ICE ICE BABY\x04\x04\x04\x04"),
-                b"ICE ICE BABY")
-            self.assertEqual(
-                c.validate_pkcs_7(b"ICE ICE BABY\x05\x05\x05\x05"), False)
-            self.assertEqual(
-                c.validate_pkcs_7(b"ICE ICE BABY\x05\x05\x05\x05"), False)
+    def test_set_2_problem_15(self):
+        c = self.crypto_kit
+        self.assertEqual(
+            c.validate_pkcs_7(b"ICE ICE BABY\x04\x04\x04\x04"),
+            b"ICE ICE BABY")
+        self.assertEqual(
+            c.validate_pkcs_7(b"ICE ICE BABY\x05\x05\x05\x05"), False)
+        self.assertEqual(
+            c.validate_pkcs_7(b"ICE ICE BABY\x05\x05\x05\x05"), False)
 
-        def test_set_2_problem_16(self):
-            c = self.crypto_kit
-            attack_string = 'AAA admin true '
-            result = c.pend_attack(attack_string)
+    def test_set_2_problem_16(self):
+        c = self.crypto_kit
+        attack_string = 'AAA admin true'
+        result = c.pend_attack(attack_string)
 
-            byte_array = bytearray(result)
-            byte_array[20] = bytes([byte_array[20] ^ 59 ^ 32])[0]
-            byte_array[26] = bytes([byte_array[26] ^ 61 ^ 32])[0]
-            byte_array[31] = bytes([byte_array[31] ^ 59 ^ 32])[0]
-            new_bytes = bytes(byte_array)
+        byte_array = bytearray(result)
+        byte_array[19] = bytes([byte_array[19] ^ 59 ^ 32])[0]
+        byte_array[25] = bytes([byte_array[25] ^ 61 ^ 32])[0]
+        new_bytes = bytes(byte_array)
 
-            self.assertEqual(c.is_admin(new_bytes), True)
+        self.assertEqual(c.is_admin(new_bytes), True)
 
-        def test_set_3_problem_17(self):
-            c = self.crypto_kit
-            encrypted_bytes, iv = c.get_random_cbc_encrypted_string()
-            chunked_bytes = list(c.chunked(16, encrypted_bytes))
+    def test_set_3_problem_17(self):
+        c = self.crypto_kit
+        encrypted_bytes, iv = c.get_random_cbc_encrypted_string()
+        chunked_bytes = list(c.chunked(16, encrypted_bytes))
 
-            answer = b''
+        answer = b''
 
-            block = iv[0:]
+        block = iv[0:]
+        plain_text = bytearray([0] * 16)
+        for target in reversed(range(len(block))):
+            pad_length = len(block) - target
+            poisoned_bytes = bytearray([0] * 16)
+            padding_bytes = bytes([0] * target) + bytes(
+                [pad_length] * pad_length)
+            for k in range(0, 256):
+                if pad_length == 1 and k == pad_length:
+                    continue
+                poisoned_bytes[target] = k
+                malformed_bytes = c.fixed_xor(block, plain_text)
+                malformed_bytes = c.fixed_xor(malformed_bytes, poisoned_bytes)
+                malformed_bytes = c.fixed_xor(malformed_bytes, padding_bytes)
+                valid_padding = c.decrypt_with_padding(chunked_bytes[0],
+                                                       malformed_bytes)
+                if valid_padding:
+                    plain_text[target] = bytes([k])[0]
+                    break
+        answer += bytes(plain_text)
+
+        for i in range(len(chunked_bytes) - 1):
+            block = chunked_bytes[i]
             plain_text = bytearray([0] * 16)
+
             for target in reversed(range(len(block))):
                 pad_length = len(block) - target
                 poisoned_bytes = bytearray([0] * 16)
@@ -346,86 +368,97 @@ class TestClass(unittest.TestCase):
                                                   poisoned_bytes)
                     malformed_bytes = c.fixed_xor(malformed_bytes,
                                                   padding_bytes)
+                    malformed_cipher = b''.join(
+                        chunked_bytes[0:i]) + malformed_bytes + chunked_bytes[
+                            i + 1]
+
                     valid_padding = c.decrypt_with_padding(
-                        chunked_bytes[0], malformed_bytes)
+                        malformed_cipher, iv)
                     if valid_padding:
                         plain_text[target] = bytes([k])[0]
                         break
             answer += bytes(plain_text)
 
-            for i in range(len(chunked_bytes) - 1):
-                block = chunked_bytes[i]
-                plain_text = bytearray([0] * 16)
+        decrypted = c.cbc_decrypt(iv=iv, encrypted_bytes=encrypted_bytes)
+        print('****decrypted', decrypted)
+        self.assertEqual(decrypted, answer)
 
-                for target in reversed(range(len(block))):
-                    pad_length = len(block) - target
-                    poisoned_bytes = bytearray([0] * 16)
-                    padding_bytes = bytes([0] * target) + bytes(
-                        [pad_length] * pad_length)
-                    for k in range(0, 256):
-                        if pad_length == 1 and k == pad_length:
-                            continue
-                        poisoned_bytes[target] = k
-                        malformed_bytes = c.fixed_xor(block, plain_text)
-                        malformed_bytes = c.fixed_xor(malformed_bytes,
-                                                      poisoned_bytes)
-                        malformed_bytes = c.fixed_xor(malformed_bytes,
-                                                      padding_bytes)
-                        malformed_cipher = b''.join(
-                            chunked_bytes[0:i]
-                        ) + malformed_bytes + chunked_bytes[i + 1]
+    def test_set_3_problem_18(self):
+        c = self.crypto_kit
+        encrypted_bytes = c.decode_base64(
+            "L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ=="
+        )
+        self.assertEqual(
+            c.ctr_encrypt(b"YELLOW SUBMARINE", 0, encrypted_bytes),
+            b"Yo, VIP Let's kick it Ice, Ice, baby Ice, Ice, baby ")
 
-                        valid_padding = c.decrypt_with_padding(
-                            malformed_cipher, iv)
-                        if valid_padding:
-                            plain_text[target] = bytes([k])[0]
-                            break
-                answer += bytes(plain_text)
+    def test_set_3_problem_19(self):
+        c = self.crypto_kit
+        with open('./tests/19.txt', 'r') as myfile:
+            plain_encoded = myfile.read().splitlines()
 
-            decrypted = c.cbc_decrypt(iv=iv, encrypted_bytes=encrypted_bytes)
-            self.assertEqual(decrypted, answer)
+        plain_texts = [c.decode_base64(result) for result in plain_encoded]
 
-        def test_set_3_problem_18(self):
-            c = self.crypto_kit
-            encrypted_bytes = c.decode_base64(
-                "L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ=="
-            )
-            self.assertEqual(
-                c.ctr_encrypt("YELLOW SUBMARINE", 0, encrypted_bytes),
-                b"Yo, VIP Let's kick it Ice, Ice, baby Ice, Ice, baby ")
+        encrypted_results = [
+            c.ctr_encrypt(plain_text=plain_text) for plain_text in plain_texts
+        ]
 
-        def test_set_3_problem_19(self):
-            c = self.crypto_kit
-            with open('./tests/19.txt', 'r') as myfile:
-                plain_encoded = myfile.read().splitlines()
+        key_stream = b''
 
-            plain_texts = [c.decode_base64(result) for result in plain_encoded]
+        for i in range(len(encrypted_results[0])):
+            max_score = 0
+            key_stream_byte = b''
+            for j in range(256):
+                score = 0
+                for line in encrypted_results:
+                    if i < len(line):
+                        possible_plain_byte = bytes([line[i] ^ j])
+                        if possible_plain_byte:
+                            possible_plain_text = possible_plain_byte[0]
+                            if c.is_english_character(possible_plain_text):
+                                score += c.letter_scores[chr(
+                                    possible_plain_text).upper()]
+                if score > max_score:
+                    max_score = score
+                    key_stream_byte = bytes([j])
+            key_stream += key_stream_byte
 
-            encrypted_results = [
-                c.ctr_encrypt(plain_text=plain_text)
-                for plain_text in plain_texts
-            ]
+        self.assertEqual(
+            c.fixed_xor(encrypted_results[0].lower(),
+                        key_stream).decode('utf-8').lower(),
+            b'i have met them at close of day'.decode('utf-8'))
 
-            key_stream = b''
+    def test_set_3_problem_20(self):
+        c = self.crypto_kit
+        with open('./tests/20.txt', 'r') as myfile:
+            plain_encoded = myfile.read().splitlines()
 
-            for i in range(len(encrypted_results[0])):
-                max_score = 0
-                key_stream_byte = b''
-                for j in range(256):
-                    score = 0
-                    for line in encrypted_results:
-                        if i < len(line):
-                            possible_plain_byte = bytes([line[i] ^ j])
-                            if possible_plain_byte:
-                                possible_plain_text = possible_plain_byte[0]
-                                if c.is_english_character(possible_plain_text):
-                                    score += c.letter_scores[chr(
-                                        possible_plain_text).upper()]
-                    if score > max_score:
-                        max_score = score
-                        key_stream_byte = bytes([j])
-                key_stream += key_stream_byte
+        plain_texts = [c.decode_base64(result) for result in plain_encoded]
 
-            self.assertEqual(
-                cryp.fixed_xor(encrypted_results[0], key_stream),
-                b'i have met them at close of daY')
+        encrypted_results = [
+            c.ctr_encrypt(plain_text=plain_text) for plain_text in plain_texts
+        ]
+
+        min_length = len(encrypted_results[0])
+
+        for encrypted in encrypted_results:
+            if len(encrypted) < min_length:
+                min_length = len(encrypted)
+
+        truncated_results = [
+            result[0:min_length] for result in encrypted_results
+        ]
+
+        key_length = min_length
+        bytes_sections = truncated_results
+        transposed = [*zip(*bytes_sections)]
+        keys = []
+        for section in transposed:
+            bytes_string = array.array('B', section).tobytes()
+            _, _, single_key = c.most_likely_stanza(bytes_string)
+            keys.append(single_key[0])
+
+        decrypt_key = bytes(keys)
+        self.assertEqual(
+            c.fixed_xor(truncated_results[0], decrypt_key),
+            b'N\'m rated "R"...this is a warning, ya better void / P')

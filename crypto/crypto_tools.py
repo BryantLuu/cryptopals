@@ -320,6 +320,7 @@ class Crypto_Kit():
         global global_random_key
         decrypted = self.cbc_decrypt(global_random_key, global_random_iv,
                                      encrypted_bytes)
+        print(decrypted)
         return b";admin=true" in decrypted
 
     def decrypt_oracle(self, encrypted_bytes):
@@ -352,7 +353,7 @@ class Crypto_Kit():
     def decrypt_with_padding(self, encrypted_bytes, iv):
         global global_random_key
         decrypted = self.cbc_decrypt(global_random_key, iv, encrypted_bytes)
-        if self.validate_pkcs_7(decrypted) is True:
+        if self.validate_pkcs_7(decrypted) is not False:
             return True
         return False
 
