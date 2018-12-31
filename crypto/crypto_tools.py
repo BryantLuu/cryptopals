@@ -2,6 +2,9 @@ import base64
 import codecs
 import math
 import struct
+import datetime
+import time
+from crypto.mt19937 import MT19937
 from Crypto.Cipher import AES
 from random import randint
 
@@ -13,7 +16,7 @@ global_random_iv = bytes([randint(0, 255) for i in range(16)])
 class Crypto_Kit():
 
     letter_scores = {
-        ' ': 15,
+        ' ': 10,
         'E': 12.02,
         'T': 9.10,
         'A': 8.12,
@@ -126,8 +129,6 @@ class Crypto_Kit():
         return bin(bytes_int_representation).lstrip('0b')
 
     def find_key_length(self, encrypted_bytes):
-        min_edit_distance = None
-        key_length = 2
         possible_key_lengths = []
         for key_guess in range(2, 41):
             bytes_sections = list(self.chunked(key_guess, encrypted_bytes))
@@ -371,4 +372,27 @@ class Crypto_Kit():
                     chunk,
                     cipher.encrypt(iv)[:len(chunk)])
             counter += 1
+        return returned_bytes
+
+    def untemper(self, y):
+        y = y ^ y >> 18
+        y = y ^ y << 15 & 4022730752
+        for i in range(7):
+            y = y ^ y << 7 & 2636928640
+        for i in range(3):
+            y = y ^ y >> 11
+        return y
+
+    def prng_ctr_encrypt(self, key=global_random_key, nonce=0, plain_text=b''):
+        if type(key) == bytes:
+            seed = int.from_bytes(key, byteorder='big')
+        else:
+            seed = key
+        prng = MT19937(seed)
+
+        key_stream = b''
+        while len(key_stream) < len(plain_text):
+            key_stream += struct.pack("<L", prng.rand())
+        returned_bytes = self.fixed_xor(plain_text,
+                                        key_stream[:len(plain_text)])
         return returned_bytes

@@ -2,6 +2,7 @@ def _int32(x):
     # Get the 32 least significant bits.
     return int(0xFFFFFFFF & x)
 
+
 class MT19937:
 
     def __init__(self, seed):
@@ -17,8 +18,13 @@ class MT19937:
         if self.index >= 624:
             self.twist()
 
-        y = self.mt[self.index]
+        y = self.temper(self.mt[self.index])
 
+        self.index = self.index + 1
+
+        return _int32(y)
+
+    def temper(self, y):
         # Right shift by 11 bits
         y = y ^ y >> 11
         # Shift y left by 7 and take the bitwise and of 2636928640
@@ -27,10 +33,7 @@ class MT19937:
         y = y ^ y << 15 & 4022730752
         # Right shift by 18 bits
         y = y ^ y >> 18
-
-        self.index = self.index + 1
-
-        return _int32(y)
+        return y
 
     def twist(self):
         for i in range(624):
@@ -43,4 +46,3 @@ class MT19937:
             if y % 2 != 0:
                 self.mt[i] = self.mt[i] ^ 0x9908b0df
         self.index = 0
-        #test
