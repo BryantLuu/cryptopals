@@ -69,3 +69,39 @@ class Set4(unittest.TestCase):
             c.fixed_xor(verification[1][:16], verification[1][-16:]), key)
 
         return
+
+    def test_set_4_problem_29(self):
+        cry = Crypto_Kit()
+        key = cry.generate_random_bytes(randint(5, 20))
+        original_message = b"comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon"
+        hash = cry.sha1(key + original_message)
+
+        registers = [int(r, 16) for r in list(cry.chunked(8, hash))]
+
+        def get_padding(message):
+            padding = b''
+            og_bit_length = len(message) * 8
+            message += bytes([128])
+            padding += bytes([128])
+            while len(message) % 64 != 56:
+                message += bytes([0])
+                padding += bytes([0])
+            message += struct.pack(">Q", og_bit_length)
+            padding += struct.pack(">Q", og_bit_length)
+            return padding
+
+        for key_length in range(21):
+            padding = get_padding(b'a' * key_length + original_message)
+            new_message = b"comment2=%20like%20a%20pound%20of%20bacon;admin=true;000"
+
+            hash = cry.sha1(new_message, *registers,
+                            (len(original_message) + len(padding) +
+                             len(new_message) + key_length) * 8)
+
+            if cry.validate_sha1_hash(
+                    key, hash, original_message + padding + new_message):
+                break
+
+        self.assertEqual(
+            cry.validate_sha1_hash(
+                key, hash, original_message + padding + new_message), True)

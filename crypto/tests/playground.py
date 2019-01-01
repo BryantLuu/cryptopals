@@ -10,22 +10,34 @@ from Crypto.Cipher import AES
 from random import randint
 
 cry = Crypto_Kit()
-key = cry.generate_random_bytes(16)
+key = cry.generate_random_bytes(randint(5, 20))
+original_message = b"comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon"
+hash = cry.sha1(key + original_message)
 
-message = b'A' * 16 + b'B' * 16 + b'C' * 16
-encrypted = cry.cbc_encrypt(key, key, message)
-split = list(cry.chunked(16, encrypted))
-mutated = b'' + split[0] + bytes([0] * 16) + split[0]
-
-decrypted = cry.cbc_decrypt(key, key, mutated)
+registers = [int(r, 16) for r in list(cry.chunked(8, hash))]
 
 
-def verify_ascii_compilance(plain_text):
-    if not all(i < 128 for i in plain_text):
-        return "invalid characters", plain_text
+def get_padding(message):
+    padding = b''
+    og_bit_length = len(message) * 8
+    message += bytes([128])
+    padding += bytes([128])
+    while len(message) % 64 != 56:
+        message += bytes([0])
+        padding += bytes([0])
+    message += struct.pack(">Q", og_bit_length)
+    padding += struct.pack(">Q", og_bit_length)
+    return padding
 
 
-verification = verify_ascii_compilance(decrypted)
+for i in range(21):
+    padding = get_padding(b'a' * i + original_message)
+    new_message = b"comment2=%20like%20a%20pound%20of%20bacon;admin=true;000"
 
-import ipdb
-ipdb.set_trace()
+    hash = cry.sha1(
+        new_message, *registers,
+        (len(original_message) + len(padding) + len(new_message) + i) * 8)
+
+    if cry.validate_sha1_hash(key, hash,
+                              original_message + padding + new_message):
+        print("got me")
