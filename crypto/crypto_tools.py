@@ -404,3 +404,12 @@ class Crypto_Kit():
             decrypted[i] = newtext[i]
 
         return self.ctr_encrypt(key, 0, bytes(decrypted))
+
+    def pend_attack_ctr(self, plain_text):
+        global global_random_iv
+        global global_random_key
+        clean = plain_text.replace(";", '')
+        clean = clean.replace("=", '')
+        concat = b"comment1=cooking%20MCs;userdata=" + bytes(
+            clean, 'utf-8') + b";comment2=%20like%20a%20pound%20of%20bacon"
+        return self.ctr_encrypt(plain_text=concat)

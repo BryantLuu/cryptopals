@@ -28,3 +28,25 @@ class Set4(unittest.TestCase):
         recovered_plain_text = c.fixed_xor(encrypted, key_stream)
 
         self.assertEqual(plain_text, recovered_plain_text)
+
+    def test_set_4_problem_26(self):
+        c = self.crypto_kit
+
+        attack_string = 'AAA admin true'
+        result = c.pend_attack_ctr(attack_string)
+        decrypted = c.ctr_encrypt(plain_text=result)
+
+        first_change_index = decrypted.index(32)
+        result_arr = bytearray(result)
+        result_arr[first_change_index] = bytes(
+            [result_arr[first_change_index] ^ 32 ^ 59])[0]
+        decrypted = c.ctr_encrypt(plain_text=bytes(result_arr))
+
+        second_change_index = decrypted.index(32)
+        result_arr[second_change_index] = bytes(
+            [result_arr[second_change_index] ^ 32 ^ 61])[0]
+        decrypted = c.ctr_encrypt(plain_text=bytes(result_arr))
+        self.assertEqual(b';admin=true' in decrypted, True)
+
+    def test_set_4_problem_27(self):
+        return
