@@ -202,7 +202,6 @@ class Set3(unittest.TestCase):
         current_time = int(time.mktime(current_time.timetuple()))
 
         for i in range(1000):
-            print("**********i", i)
             random_bytes = b''
             guess_seed = current_time - i & 0xFFFF
             prng = MT19937(guess_seed)

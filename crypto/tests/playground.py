@@ -9,26 +9,18 @@ from crypto.mt19937 import MT19937
 from Crypto.Cipher import AES
 from random import randint
 
-c = Crypto_Kit()
-now = datetime.datetime.now()
-now = int(time.mktime(now.timetuple()))
-original_seed = now & 0xFFFF
-known_text = c.generate_random_bytes(randint(5, 30)) + bytes([b'A' [0]] * 14)
-encrypted = c.prng_ctr_encrypt(key=original_seed, plain_text=known_text)
+cry = Crypto_Kit()
 
-padding = len(encrypted) - len(known_text)
-known_text = bytes([0] * padding) + known_text
-current_time = datetime.datetime.now()
-current_time = int(time.mktime(current_time.timetuple()))
+with open('./tests/25.txt', 'r') as myfile:
+    base_64_text = myfile.read()
+encrypted_text = cry.decode_base64(base_64_text)
+random_key = bytes([randint(0, 255) for i in range(16)])
+plain_text = cry.ecb_decrypt(b"YELLOW SUBMARINE", encrypted_text)
+encrypted = cry.ctr_encrypt(random_key, 0, plain_text)
+decrypted_text = b''
 
-for i in range(1000):
-    print("**********i", i)
-    random_bytes = b''
-    guess_seed = current_time - i & 0xFFFF
-    prng = MT19937(guess_seed)
-    while len(random_bytes) < len(encrypted):
-        random_bytes += struct.pack("<L", prng.rand())
+new_text = bytes([0] * len(encrypted))
+key_stream = cry.edit(encrypted, random_key, 0, new_text)
 
-    result = c.fixed_xor(known_text, random_bytes[:len(known_text)])
-    if encrypted[padding:] == result[padding:]:
-        break
+import ipdb
+ipdb.set_trace()

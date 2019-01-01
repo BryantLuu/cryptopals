@@ -396,3 +396,11 @@ class Crypto_Kit():
         returned_bytes = self.fixed_xor(plain_text,
                                         key_stream[:len(plain_text)])
         return returned_bytes
+
+    def edit(self, ciphertext, key, offset, newtext):
+        decrypted = self.ctr_encrypt(key, 0, ciphertext)
+        decrypted = bytearray(decrypted)
+        for i in range(offset, len(newtext)):
+            decrypted[i] = newtext[i]
+
+        return self.ctr_encrypt(key, 0, bytes(decrypted))
