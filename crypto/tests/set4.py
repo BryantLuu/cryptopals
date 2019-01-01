@@ -49,4 +49,23 @@ class Set4(unittest.TestCase):
         self.assertEqual(b';admin=true' in decrypted, True)
 
     def test_set_4_problem_27(self):
+        c = self.crypto_kit
+        key = c.generate_random_bytes(16)
+
+        message = b'A' * 16 + b'B' * 16 + b'C' * 16
+        encrypted = c.cbc_encrypt(key, key, message)
+        split = list(c.chunked(16, encrypted))
+        mutated = b'' + split[0] + bytes([0] * 16) + split[0]
+
+        decrypted = c.cbc_decrypt(key, key, mutated)
+
+        def verify_ascii_compilance(plain_text):
+            if not all(i < 128 for i in plain_text):
+                return "invalid characters", plain_text
+
+        verification = verify_ascii_compilance(decrypted)
+
+        self.assertEqual(
+            c.fixed_xor(verification[1][:16], verification[1][-16:]), key)
+
         return

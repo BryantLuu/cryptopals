@@ -182,7 +182,7 @@ class Crypto_Kit():
 
     def cbc_decrypt(self,
                     key=global_random_key,
-                    iv=global_random_key,
+                    iv=global_random_iv,
                     encrypted_bytes=b''):
         cipher = AES.new(key, AES.MODE_ECB)
         decrypted_bytes = b""
